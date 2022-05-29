@@ -29,12 +29,14 @@ void main() {
           permissionDeniedErrorHandler,
           flavorUndefinedHandler,
           r8FailureHandler,
-          minSdkVersion,
-          transformInputIssue,
-          lockFileDepMissing,
+          minSdkVersionHandler,
+          transformInputIssueHandler,
+          lockFileDepMissingHandler,
           multidexErrorHandler,
           incompatibleKotlinVersionHandler,
           minCompileSdkVersionHandler,
+          jvm11RequiredHandler,
+          outdatedGradleHandler,
         ])
       );
     });
@@ -361,6 +363,11 @@ Execution failed for task ':app:mergeDexDebug'.
       );
       expect(testLogger.statusText,
         contains(
+          'See https://docs.flutter.dev/deployment/android#enabling-multidex-support for more information.'
+        )
+      );
+      expect(testLogger.statusText,
+        contains(
           'Your `android/app/src/main/AndroidManifest.xml` does not contain'
         )
       );
@@ -426,7 +433,7 @@ Execution failed for task ':app:mergeDexDebug'.
     }, overrides: <Type, Generator>{
       FileSystem: () => MemoryFileSystem.test(),
       ProcessManager: () => FakeProcessManager.any(),
-      AnsiTerminal: () => _TestPromptTerminal('y')
+      AnsiTerminal: () => _TestPromptTerminal('y'),
     });
 
     testUsingContext('exits if multidex support skipped', () async {
@@ -492,7 +499,7 @@ Execution failed for task ':app:mergeDexDebug'.
     }, overrides: <Type, Generator>{
       FileSystem: () => MemoryFileSystem.test(),
       ProcessManager: () => FakeProcessManager.any(),
-      AnsiTerminal: () => _TestPromptTerminal('n')
+      AnsiTerminal: () => _TestPromptTerminal('n'),
     });
 
     testUsingContext('exits if multidex support disabled', () async {
@@ -753,13 +760,13 @@ assembleProfile
 
     testWithoutContext('pattern', () {
       expect(
-        minSdkVersion.test(stdoutLine),
+        minSdkVersionHandler.test(stdoutLine),
         isTrue,
       );
     });
 
     testUsingContext('suggestion', () async {
-      await minSdkVersion.handler(
+      await minSdkVersionHandler.handler(
         line: stdoutLine,
         project: FlutterProject.fromDirectoryTest(globals.fs.currentDirectory),
       );
@@ -770,9 +777,12 @@ assembleProfile
           '\n'
           '┌─ Flutter Fix ─────────────────────────────────────────────────────────────────────────────────┐\n'
           '│ The plugin webview_flutter requires a higher Android SDK version.                             │\n'
-          '│ Fix this issue by adding the following to the file /android/local.properties:                 │\n'
-          '│                                                                                               │\n'
-          '│ flutter.minSdkVersion=19                                                                      │\n'
+          '│ Fix this issue by adding the following to the file /android/app/build.gradle:                 │\n'
+          '│ android {                                                                                     │\n'
+          '│   defaultConfig {                                                                             │\n'
+          '│     minSdkVersion 19                                                                          │\n'
+          '│   }                                                                                           │\n'
+          '│ }                                                                                             │\n'
           '│                                                                                               │\n'
           "│ Note that your app won't be available to users running Android SDKs below 19.                 │\n"
           '│ Alternatively, try to find a version of this plugin that supports these lower versions of the │\n'
@@ -794,7 +804,7 @@ assembleProfile
   group('transform input issue', () {
     testWithoutContext('pattern', () {
       expect(
-        transformInputIssue.test(
+        transformInputIssueHandler.test(
           'https://issuetracker.google.com/issues/158753935'
         ),
         isTrue,
@@ -802,7 +812,7 @@ assembleProfile
     });
 
     testUsingContext('suggestion', () async {
-      await transformInputIssue.handler(
+      await transformInputIssueHandler.handler(
         project: FlutterProject.fromDirectoryTest(globals.fs.currentDirectory),
       );
 
@@ -832,7 +842,7 @@ assembleProfile
   group('Dependency mismatch', () {
     testWithoutContext('pattern', () {
       expect(
-        lockFileDepMissing.test('''
+        lockFileDepMissingHandler.test('''
 * What went wrong:
 Execution failed for task ':app:generateDebugFeatureTransitiveDeps'.
 > Could not resolve all artifacts for configuration ':app:debugRuntimeClasspath'.
@@ -844,7 +854,7 @@ Execution failed for task ':app:generateDebugFeatureTransitiveDeps'.
     });
 
     testUsingContext('suggestion', () async {
-      await lockFileDepMissing.handler(
+      await lockFileDepMissingHandler.handler(
         project: FlutterProject.fromDirectoryTest(globals.fs.currentDirectory),
       );
 
@@ -873,6 +883,10 @@ Execution failed for task ':app:generateDebugFeatureTransitiveDeps'.
         incompatibleKotlinVersionHandler.test('Module was compiled with an incompatible version of Kotlin. The binary version of its metadata is 1.5.1, expected version is 1.1.15.'),
         isTrue,
       );
+      expect(
+        incompatibleKotlinVersionHandler.test("class 'kotlin.Unit' was compiled with an incompatible version of Kotlin."),
+        isTrue,
+      );
     });
 
     testUsingContext('suggestion', () async {
@@ -890,6 +904,51 @@ Execution failed for task ':app:generateDebugFeatureTransitiveDeps'.
           '│ update /android/build.gradle:                                                                │\n'
           "│ ext.kotlin_version = '<latest-version>'                                                      │\n"
           '└──────────────────────────────────────────────────────────────────────────────────────────────┘\n'
+        )
+      );
+    }, overrides: <Type, Generator>{
+      GradleUtils: () => FakeGradleUtils(),
+      Platform: () => fakePlatform('android'),
+      FileSystem: () => MemoryFileSystem.test(),
+      ProcessManager: () => FakeProcessManager.empty(),
+    });
+  });
+
+  group('Bump Gradle', () {
+    const String errorMessage = '''
+A problem occurred evaluating project ':app'.
+> Failed to apply plugin [id 'kotlin-android']
+   > The current Gradle version 4.10.2 is not compatible with the Kotlin Gradle plugin. Please use Gradle 6.1.1 or newer, or the previous version of the Kotlin plugin.
+''';
+
+    testWithoutContext('pattern', () {
+      expect(
+        outdatedGradleHandler.test(errorMessage),
+        isTrue,
+      );
+    });
+
+    testUsingContext('suggestion', () async {
+      await outdatedGradleHandler.handler(
+        line: errorMessage,
+        project: FlutterProject.fromDirectoryTest(globals.fs.currentDirectory),
+      );
+
+      expect(
+        testLogger.statusText,
+        contains(
+          '\n'
+          '┌─ Flutter Fix ────────────────────────────────────────────────────────────────────┐\n'
+          '│ [!] Your project needs to upgrade Gradle and the Android Gradle plugin.          │\n'
+          '│                                                                                  │\n'
+          '│ To fix this issue, replace the following content:                                │\n'
+          '│ /android/build.gradle:                                                           │\n'
+          "│     - classpath 'com.android.tools.build:gradle:<current-version>'               │\n"
+          "│     + classpath 'com.android.tools.build:gradle:7.1.2'                           │\n"
+          '│ /android/gradle/wrapper/gradle-wrapper.properties:                               │\n'
+          '│     - https://services.gradle.org/distributions/gradle-<current-version>-all.zip │\n'
+          '│     + https://services.gradle.org/distributions/gradle-7.4-all.zip               │\n'
+          '└──────────────────────────────────────────────────────────────────────────────────┘\n'
         )
       );
     }, overrides: <Type, Generator>{
@@ -952,6 +1011,49 @@ Execution failed for task ':app:checkDebugAarMetadata'.
       ProcessManager: () => FakeProcessManager.empty(),
     });
   });
+
+  group('Java 11 requirement', () {
+    testWithoutContext('pattern', () {
+      expect(
+        jvm11RequiredHandler.test('''
+* What went wrong:
+A problem occurred evaluating project ':flutter'.
+> Failed to apply plugin 'com.android.internal.library'.
+   > Android Gradle plugin requires Java 11 to run. You are currently using Java 1.8.
+     You can try some of the following options:
+       - changing the IDE settings.
+       - changing the JAVA_HOME environment variable.
+       - changing `org.gradle.java.home` in `gradle.properties`.'''
+        ),
+        isTrue,
+      );
+    });
+
+    testUsingContext('suggestion', () async {
+      await jvm11RequiredHandler.handler();
+
+      expect(
+        testLogger.statusText,
+        contains(
+          '\n'
+          '┌─ Flutter Fix ─────────────────────────────────────────────────────────────────┐\n'
+          '│ [!] You need Java 11 or higher to build your app with this version of Gradle. │\n'
+          '│                                                                               │\n'
+          '│ To get Java 11, update to the latest version of Android Studio on             │\n'
+          '│ https://developer.android.com/studio/install.                                 │\n'
+          '│                                                                               │\n'
+          '│ To check the Java version used by Flutter, run `flutter doctor -v`.           │\n'
+          '└───────────────────────────────────────────────────────────────────────────────┘\n'
+        )
+      );
+    }, overrides: <Type, Generator>{
+      GradleUtils: () => FakeGradleUtils(),
+      Platform: () => fakePlatform('android'),
+      FileSystem: () => MemoryFileSystem.test(),
+      ProcessManager: () => FakeProcessManager.empty(),
+    });
+  });
+
 }
 
 bool formatTestErrorMessage(String errorMessage, GradleHandledError error) {

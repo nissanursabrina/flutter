@@ -108,23 +108,23 @@ class SwitchThemeData with Diagnosticable {
   }
 
   @override
-  int get hashCode {
-    return hashValues(
-      thumbColor,
-      trackColor,
-      materialTapTargetSize,
-      mouseCursor,
-      overlayColor,
-      splashRadius,
-    );
-  }
+  int get hashCode => Object.hash(
+    thumbColor,
+    trackColor,
+    materialTapTargetSize,
+    mouseCursor,
+    overlayColor,
+    splashRadius,
+  );
 
   @override
   bool operator ==(Object other) {
-    if (identical(this, other))
+    if (identical(this, other)) {
       return true;
-    if (other.runtimeType != runtimeType)
+    }
+    if (other.runtimeType != runtimeType) {
       return false;
+    }
     return other is SwitchThemeData
       && other.thumbColor == thumbColor
       && other.trackColor == trackColor
@@ -152,8 +152,9 @@ class SwitchThemeData with Diagnosticable {
     T Function(T?, T?, double) lerpFunction,
   ) {
     // Avoid creating a _LerpProperties object for a common case.
-    if (a == null && b == null)
+    if (a == null && b == null) {
       return null;
+    }
     return _LerpProperties<T>(a, b, t, lerpFunction);
   }
 }
@@ -190,10 +191,10 @@ class _LerpProperties<T> implements MaterialStateProperty<T> {
 class SwitchTheme extends InheritedWidget {
   /// Constructs a switch theme that configures all descendant [Switch] widgets.
   const SwitchTheme({
-    Key? key,
+    super.key,
     required this.data,
-    required Widget child,
-  }) : super(key: key, child: child);
+    required super.child,
+  });
 
   /// The properties used for all descendant [Switch] widgets.
   final SwitchThemeData data;

@@ -215,30 +215,30 @@ class ScrollbarThemeData with Diagnosticable {
   }
 
   @override
-  int get hashCode {
-    return hashValues(
-      thumbVisibility,
-      thickness,
-      trackVisibility,
-      showTrackOnHover,
-      isAlwaysShown,
-      interactive,
-      radius,
-      thumbColor,
-      trackColor,
-      trackBorderColor,
-      crossAxisMargin,
-      mainAxisMargin,
-      minThumbLength,
-    );
-  }
+  int get hashCode => Object.hash(
+    thumbVisibility,
+    thickness,
+    trackVisibility,
+    showTrackOnHover,
+    isAlwaysShown,
+    interactive,
+    radius,
+    thumbColor,
+    trackColor,
+    trackBorderColor,
+    crossAxisMargin,
+    mainAxisMargin,
+    minThumbLength,
+  );
 
   @override
   bool operator ==(Object other) {
-    if (identical(this, other))
+    if (identical(this, other)) {
       return true;
-    if (other.runtimeType != runtimeType)
+    }
+    if (other.runtimeType != runtimeType) {
       return false;
+    }
     return other is ScrollbarThemeData
       && other.thumbVisibility == thumbVisibility
       && other.thickness == thickness
@@ -280,8 +280,9 @@ class ScrollbarThemeData with Diagnosticable {
     T Function(T?, T?, double) lerpFunction,
   ) {
     // Avoid creating a _LerpProperties object for a common case.
-    if (a == null && b == null)
+    if (a == null && b == null) {
       return null;
+    }
     return _LerpProperties<T>(a, b, t, lerpFunction);
   }
 }
@@ -321,10 +322,10 @@ class ScrollbarTheme extends InheritedWidget {
   /// Constructs a scrollbar theme that configures all descendant [Scrollbar]
   /// widgets.
   const ScrollbarTheme({
-    Key? key,
+    super.key,
     required this.data,
-    required Widget child,
-  }) : super(key: key, child: child);
+    required super.child,
+  });
 
   /// The properties used for all descendant [Scrollbar] widgets.
   final ScrollbarThemeData data;
